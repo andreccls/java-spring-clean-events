@@ -16,11 +16,12 @@ class EventApiIT extends ApiIT {
 
     @Test
     void createsAndFetchesAnEvent() throws Exception {
-        postJson("/events", eventJson("Meetup", 50))
+        String id = idOf(postJson("/events", eventJson("Meetup", 50))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", containsString("/events/")))
                 .andExpect(jsonPath("$.status").value("DRAFT"))
-                .andExpect(jsonPath("$.venue.name").value("Hall"));
+                .andExpect(jsonPath("$.venue.name").value("Hall")));
+        getJson("/events/" + id).andExpect(status().isOk()).andExpect(jsonPath("$.title").value("Meetup"));
         getJson("/events").andExpect(status().isOk()).andExpect(jsonPath("$.total").value(1));
     }
 
