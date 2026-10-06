@@ -1,0 +1,58 @@
+# Local development stack. All passwords below are DEVELOPMENT-ONLY defaults:
+# never reuse them anywhere else. Override through a `.env` file (see .env.example).
+name: java-spring-clean-events
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-dev_only_root_password}
+      MYSQL_DATABASE: events
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3316}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+
+  api:
+    build: .
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/events
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-dev_only_root_password}
+    ports:
+      - "127.0.0.1:${API_PORT:-8090}:8080"
+    healthcheck:
+      # The JRE image has no curl/wget: plain TCP probe through bash.
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+
+  # Maven + JDK toolbox used by the Makefile when `mvn` is not installed locally.
+  maven:
+    image: maven:3.9-eclipse-temurin-21
+    profiles: ["tools"]
+    working_dir: /workspace
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      TEST_MYSQL_URL: jdbc:mysql://mysql:3306/events_test?createDatabaseIfNotExist=true
+      TEST_MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-dev_only_root_password}
+    volumes:
+      - ./:/workspace
+      - m2-cache:/root/.m2
+
+volumes:
+  mysql-data:
+  m2-cache:
